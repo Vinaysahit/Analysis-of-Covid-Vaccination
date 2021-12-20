@@ -1,0 +1,363 @@
+---
+title: "Analysis of COVID Vaccination progress across the world"
+author: 1 ) Piranavakumar Kandaswamy  2 ) Vinay Sahit Gudavalli  3 ) Sai Umesh Chandra Gade
+date: "12/06/2021"
+output: 
+ html_document:
+    fig_width: 8
+    code_folding: hide
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: true
+  
+ 
+---
+
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+library(dplyr) 
+library(plotly)
+library(sampling)
+library(rnaturalearth)
+library(leaflet)
+library(DT)
+library(ggplot2)
+library(tidyverse)
+library(stringr)
+
+```
+
+# Dataset Overview
+
+For the project analysis, we have used two different primary datasets sourced from Kaggle for 11 months from Jan-2021 to Nov-2021, where the first dataset contains data of world countries and each country's daily vaccinations for over 220 countries, and the other dataset describes the 8 different vaccine manufactures across the world. Additionally, we used additional data sets to retrieve ISO codes to prepare analysis and graphical interpretation.
+
+The variables in the first data set consist of location, date, total vaccinations, fully vaccinated people, daily vaccinations, and daily vaccination per hundred and per million.
+
+The Second dataset has country data, types of vaccination manufacturers, and total vaccination for each vaccine manufacture supply chain.
+
+
+
+
+# Data preparation
+
+After data gathering, we filtered the raw data, removing redundant columns, keeping the required variables date, country, total vaccination dates,  daily vaccination, daily vaccination per million. To retrieve the complete vaccination of each country, we performed a "group by function" on the data set based on the country data and retried the full vaccination of each country using the dplyr libraries of R for the first dataset. For the second data set, we performed group by function on vaccine manufacture with locations to find the total vaccination of each vaccine manufacture in all the calculated countries. Then for the third data set, we performed the "inner join function" between the first 2 data set and the third dataset to retrieve the ISO codes of the respective countries.
+
+
+# Goal of Analysis
+
+The analysis aims to analyze daily vaccination trends, total vaccination across the world, and the different distributions between the high GDP counties and low GDP countries.
+
+
+# General analysis of country vaccinations:
+
+## Top 5 vaccinated countries
+
+Using the data retrieved from the group by function on the data set, we can find out the top 5 countries with the highest number of vaccinations overall.
+
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+covi_1 = read.csv("country_vaccinations.csv")
+keeps = c("country","date","total_vaccinations","daily_vaccinations","daily_vaccinations_per_million")
+df= covi_1[keeps]
+by_country = df %>% group_by(country) %>% summarise(total_vac = sum(daily_vaccinations,na.rm = TRUE)) 
+
+x = head(by_country[order(by_country$total_vac,decreasing = TRUE),],5)
+names = x$country
+total_vacination = x$total_vac
+plot_ly(x, x = ~country, y= ~total_vac, color = ~country) %>%
+  layout(title = '5 Top countries in vaccination progress', xaxis = list(title = 'Countries'), font=t, plot_bgcolor = "#e5ecf6",
+         yaxis = list(title = 'Number of vaccinations'))
+
+```
+The above graph "Top 5 countries in vaccination" shows the progress of countries "Brazil", "China", "India", "Indonesia", "United States". where we can observe that China has more vaccination rates compares to other with lead of 2.4 Billion where as followed by India and comes United states and with almost similar rates for Brazil and Indonesia.
+
+Out of these countries only one is considered as developed countries and the rest are developing countries which is surprising, 
+
+## Daily Vaccination rate of top 5 countries
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+keeps2 = c("country","daily_vaccinations") 
+China = filter(covi_1, country == "China")
+China_df = China[keeps2]
+
+India = filter(covi_1, country == "India")
+India_df = India[keeps2]
+
+US = filter(covi_1, country == "United States")
+US_df = US[keeps2]
+
+Brazil = filter(covi_1, country == "Brazil")
+Brazil_df = Brazil[keeps2]
+
+Indonesia = filter(covi_1, country == "Indonesia")
+Indonesia_df = Indonesia[keeps2]
+```
+
+We used the daily vaccinations data to plot the graph below showing the daily observations of minimum and maximum vaccinations and the median in millions. This box plot shows the distribution of daily vaccination of the top 5 countries, considering the daily vaccine, and we calculated the median for all the data for a daily vaccine. The third quartile of china's box plot is larger compared to the others informing us that the daily vaccination progress in china is discrete. The improvement of daily vaccination in India is constant compared to the other four countries.
+
+
+```{r by_country, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+plot_ly(by_country, x = ~by_country, type="box", name = 'Total Vaccinations') %>%
+  add_trace(x = ~China_df$daily_vaccinations, name = 'China') %>%
+  add_trace(x = ~India_df$daily_vaccinations, name = 'India') %>%
+  add_trace(x = ~US_df$daily_vaccinations, name = 'US') %>%
+  add_trace(x = ~Brazil_df$daily_vaccinations, name = 'Brazil') %>%
+  add_trace(x = ~Indonesia_df$daily_vaccinations, name = 'Indonesia') %>%
+  layout(yaxis = list(title = 'Top 5 countries'),orientation='h',
+         xaxis = list(title = 'Daily vaccinations'),
+         title = 'Daily vaccination of top 5 countries')-> p
+
+p
+```
+
+
+Box plots show overall patterns of response of the top 5 countries during the second covid wave. They provide a helpful way to visualize the range and other characteristics of reactions for a large group which can be interfered with from the geo map presented below.
+ 
+# Manufacturers
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+covi_2 = read.csv("country_vaccinations_by_manufacturer.csv")
+```
+
+
+# Disturbution of different vaccines across the world
+
+```{r message=FALSE, warning=FALSE, , echo=TRUE, include=FALSE, paged.print=FALSE}
+by_country_2 = covi_2 %>% group_by(location,vaccine)%>%summarise(total_vac = max(total_vaccinations,na.rm = TRUE))
+```
+
+
+We used Plotly to compare the following data: the pie chart, in the pie chat we can observe that the significant portion of the vaccination is manufactured by Pfizer/BioNTech with 68.7%% and followed by Moderna with 17%, where the last pie is covered by Oxford/AstraZeneca with 8.52 % and next to coves the almost identical portions by Johnson&Johnson and Sinovac with almost similar 2.71 % and 2.666 % followed by the least three manufactures, Sinopharm/Beijing, Sputnik, and Cansino with 0.192 % and 0.0515% in the vaccination trends for the 11 months recorded data. We can infer 85% of the total vaccinations are done by Pfizer and Moderna, and the rest of the portion is covered by the other seven vaccine providers.
+
+```{r by_country_2, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+plot_ly(by_country_2, labels = ~by_country_2$vaccine, values = ~by_country_2$total_vac, type = 'pie') %>%
+  layout(title = 'Disturbution of different vaccines accross the world', font=t)
+```
+
+
+
+# Distribution of vaccines according to manufacturers amongst four different countries
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+chile_df = filter(by_country_2, location == "Chile")
+ecuador_df = filter(by_country_2, location == "Ecuador")
+European_df = filter(by_country_2, location == "France")
+us_df2 = filter(by_country_2, location == "United States")
+
+q2 = rbind(chile_df,ecuador_df,European_df,us_df2)
+
+plot_ly(q2,
+    x = ~location, 
+    y = ~total_vac, 
+    color= ~vaccine,
+    type = 'bar') %>% 
+  layout(
+    yaxis = list(title = 'Value'), 
+    barmode = 'stack')%>%
+  layout(title = 'Distribution of different vaccines between low and high GDP countries', xaxis = list(title = 'Countries'), font=t,
+         yaxis = list(title = 'Vaccinations'))
+
+```
+
+How the rich has access to more expensive vaccine like Pfizer and Moderna and the developing only has access to only sinovac, china vaccine. The developing countries "Chile" and "Ecuador" and the developed  countries "France" and "United States" have two different major vaccine providers. The developing countries used Sinovac, whereas the developed countries used Pzifer to vaccinate most of their population. Moderna is  the seccond  leading vaccine provder in the developed countries where Oxford/Astrazenica is the commmonly avaliale in all the countries.
+
+
+
+# The analysis of daily vaccination rates
+```{r echo=FALSE, message=FALSE, warning=FALSE, ,echo=TRUE, paged.print=FALSE}
+plot_ly(covi_1, x = ~daily_vaccinations_per_million, type = "histogram", prob = TRUE, color= "", histnorm="probability", ylim = c(0,0.1))%>%
+  layout(title = 'Distribution of daily vaccination rate per million across the world', xaxis = list(title = 'Daily Vaccinations'), font=t,
+         yaxis = list(title = 'Density'))
+
+```
+The above graph is daily distributions of vaccinations this is the distribution of daily vaccination rate per million of all the countries that are present in the dataset, as we can see the the data distribution is positively skewed to the right. 
+
+```{r mean, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+m1 = mean(na.omit(covi_1$daily_vaccinations_per_million))
+print(paste("The mean of the daily vaccination is ",m1))
+```
+
+
+```{r sd, echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+sd1 = sd(na.omit(covi_1$daily_vaccinations_per_million))
+print(paste("The standard deviation of the daily vaccination is ",sd1))
+```
+
+
+# Central Limit Theorem
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+set.seed(9999)
+options(scipen = 100)
+samples = 10000
+xbar1 = numeric(samples)
+color1 = c("brown1","darkorchid","gold1","darkseagreen1")
+e = htmltools::tagList()
+traces = numeric(40)
+traces[10] = "Sample of 10 "
+traces[20] = "Sample of 20 "
+traces[30] ="Sample of 30 "
+traces[40] ="Sample of 40 "
+for (i in c(10,20,30,40))
+  {
+  for(j in 1:samples)
+    {
+    xbar1[j] = mean(sample(covi_1$daily_vaccinations_per_million,size=i, replace=TRUE))
+  }
+    e[[i]] = plot_ly(x = xbar1, type = "histogram" ,colors = color1[i], histnorm = "probability", name = traces[i])
+    
+  cat("Sample Size = ", i, " Mean = ", mean(na.omit(xbar1))," SD = ", sd(na.omit(xbar1)), "\n")
+}
+
+grap = subplot(e[[10]],e[[20]],e[[30]],e[[40]], nrows = 2)%>%
+  layout(title = 'Distribution of daily vaccination across the world per million')
+grap
+
+
+
+```
+## Finding
+
+Due to the central limit theorem, the mean of different types of samples does not change from the standard of the original distribution.
+
+
+As we can see, the daily vaccination rate across the globe is skewed; we can apply the central limit theorem, which is usually distributed, which we presented with 4 sample graphs.
+
+As displayed in the histogram above, the distribution is normal. Below are histograms showing the sample means of 10000 random samples of sample sizes 10, 20, 30, and 40 following a normal distribution.
+
+# Sampling
+
+Sampling is used to identify and analyze trends or patterns that can be seen in a subset of a larger data group. It can also be a helpful technique to help predict some type of data or information. There are many different types of sampling that can be applied to data. The sampling methods used for this analysis are simple random sampling without replacement, systematic, and stratified. 
+
+Sampling is used to identify and analyze trends or patterns that can be seen in a subset of a larger data group. It can likewise be a valuable method to assist with anticipating some sort of information or data. There are many different types of sampling that can be applied to data. The sampling methods used for this analysis are simple random sampling without replacement, systematic, and stratified. The selection was specifically looking at the vaccination progress. Simple random sampling is when a specified sample is selected from the larger group or larger frame. Each vaccine has an equal opportunity of getting selected. A sample size of 1000 is being used. Out of the population, there will be 1000 randomly chosen without replacement per every million. Another technique that was used to sample the data was stratified sampling. Stratified sampling is when the larger data group is broken into smaller groups, and then specific sizes are picked from each group. 
+
+ 
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+#srswor
+n =1000
+N = nrow(covi_1)
+s1=srswor(n,N)
+```
+
+## Finding
+
+For analyzing with the data we collected to compare with the generated information, as can be interpreted from each of the graphs upon comparison, the sampling is similar to the vaccination rate in the globe.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+x = covi_1$daily_vaccinations_per_million[s1!=0] 
+
+samp1 = plot_ly(covi_1, x = ~daily_vaccinations_per_million[s1!=0], type = "histogram", histnorm = "probability", name = "Simple Random w/o replacement")  
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+#systematic
+k = ceiling(N/n)
+
+r = sample(k,1)
+
+s2 =seq(r,by = k, length=n)  
+
+x = covi_1$daily_vaccinations_per_million[s2!=0]  
+
+samp2 = plot_ly(covi_1, x = ~daily_vaccinations_per_million[s2!=0], type = "histogram", histnorm="probability", name = "Systematic Sampling")  
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+#stratified 
+f = table(covi_1$country)
+
+sizes = round(10000*f/sum(f))
+
+st = sampling::strata(covi_1, stratanames = c("country"), size=sizes, method = "srswr")
+
+sample = getdata(covi_1,st)  
+
+samp3 = plot_ly(sample, x = ~daily_vaccinations_per_million, type = "histogram", histnorm ="probability", name = "Stratified Sampling")
+
+distgraph = plot_ly(covi_1, x = ~daily_vaccinations_per_million, type = "histogram", prob = TRUE, histnorm="probability", name = "Population")
+
+
+sampling = subplot(distgraph,samp1,samp2,samp3, nrows = 2)
+
+sampling
+
+
+```
+## Findings
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+cat(" Mean of Population = ", mean(na.omit(covi_1$daily_vaccinations_per_million))," SD = ", sd(na.omit(covi_1$daily_vaccinations_per_million)), "\n")
+cat(" Mean of simple random sampling without replacement = ", mean(na.omit(covi_1$daily_vaccinations_per_million[s1!=0]))," SD = ", sd(na.omit(covi_1$daily_vaccinations_per_million[s1!=0])), "\n")
+cat(" Mean of systematic sampling = ", mean(na.omit(covi_1$daily_vaccinations_per_million[s2!=0]))," SD = ", sd(na.omit(covi_1$daily_vaccinations_per_million[s2!=0])), "\n")
+cat(" Mean of stratified sampling = ", mean(na.omit(sample$daily_vaccinations_per_million))," SD = ", sd(na.omit(sample$daily_vaccinations_per_million)), "\n")
+```
+As we can see the mean between the three types of sampling is nearly equal to each other.
+
+# Visualization
+
+## Visualization of total vaccine progress till date 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+by_country = df %>% group_by(country) %>% summarise(total_vac = sum(daily_vaccinations,na.rm = TRUE)) 
+coordinate = read.csv("co-ords.csv")
+names(coordinate)[1] = "country"
+mapfile1 = by_country %>% inner_join(coordinate, by = "country") %>% 
+select(country, total_vac,Alpha.3.code)
+names(mapfile1)[3] = "code"
+mapfile1$code = str_trim(mapfile1$code)
+l <- list(color = toRGB("grey"), width = 0.5)
+g <- list(
+  showframe = FALSE,
+  showcoastlines = FALSE,
+  projection = list(type = 'Mercator')
+)
+
+fig = plot_geo(mapfile1) 
+fig <- fig %>% add_trace(
+  z = ~total_vac, color = ~total_vac, locations = ~code,text = ~country,marker = list(line = l))
+fig <- fig %>% colorbar(title = 'Total Vaccinations')
+fig <- fig %>% layout( title = "Total Vaccination around the world",
+  geo = g
+)
+
+fig
+```
+The geographical map shows that the vaccination process is directly proportional to the countries' total population. The peculiar observation of developed countries like the United States still showed lower vaccination rates than developing countries. 
+
+## Vizualization of daily vaccine progress
+```{r}
+
+mapfile2 = df %>% inner_join(coordinate, by = "country") %>% select(country,Alpha.3.code, date, daily_vaccinations_per_million,total_vaccinations)
+names(mapfile2)[2] = "code"
+mapfile2$code = str_trim(mapfile2$code)
+
+graph = plot_geo(mapfile2, locationmode = "world", frame =~date)%>%
+  add_trace(locations = ~code, z=~daily_vaccinations_per_million, color = ~daily_vaccinations_per_million, colorscale = "Greens") %>%
+  layout(title = 'Vaccination progress across the world per day')
+graph
+
+```
+
+This shows the daily vaccination per million rates after the second wave where the countries led the efforts to increase their vaccination programs from December - 2020 to November - 2021. We can observe the delay in African continent vaccination rates compared to others. We can also see the vaccination rate observed from Aug  - 2021 in Northern America, which infers the increased covid rates.
+
+
+# Conlusion
+
+Through this analysis, we showed the distribution of different vaccines across the globe, and we were able to examine the difference in the rollout of the vaccine in developed and developing countries.
+We also found out how the developing countries progressed the lack of vaccines by using inexpensive vaccines.
